@@ -107,20 +107,59 @@ function checkIntersection(routePath, dangerZones) {
   return intersections;
 }
 
-function computeDetourPoint(intersection, routePath) {
-  const idx = intersection.pointIndex;
-  const center = { lat: intersection.zone.lat, lng: intersection.zone.lng };
-  const prev = routePath[Math.max(0, idx - 1)] || routePath[idx];
-  const next = routePath[Math.min(routePath.length - 1, idx + 1)] || routePath[idx];
-  const baseBearing = bearingDegrees(prev, next);
+function avoidDangerZonesGeometrically(routePath, dangerZones) {
+  let safePath = [...routePath];
+  let modificationsMade = true;
+  let passes = 0;
+  let intersectedZonesMap = new Map();
 
-  const targetOffset = Math.max(DETOUR_OFFSET_M, intersection.zone.radius + 150);
-  const optionA = destinationPoint(center, targetOffset, baseBearing + 90);
-  const optionB = destinationPoint(center, targetOffset, baseBearing - 90);
-
-  const distA = haversineDistanceMeters(optionA, routePath[idx]);
-  const distB = haversineDistanceMeters(optionB, routePath[idx]);
-  return distA < distB ? optionA : optionB;
+  while (modificationsMade && passes < 20) {
+    modificationsMade = false;
+    passes++;
+    
+    for (let z = 0; z < dangerZones.length; z++) {
+      const zone = dangerZones[z];
+      let entryIdx = -1;
+      let exitIdx = -1;
+      
+      for (let i = 0; i < safePath.length; i++) {
+        const dist = haversineDistanceMeters(safePath[i], { lat: zone.lat, lng: zone.lng });
+        if (dist <= zone.radius) {
+          if (entryIdx === -1) entryIdx = Math.max(0, i - 1);
+          exitIdx = Math.min(safePath.length - 1, i + 1);
+        }
+      }
+      
+      if (entryIdx !== -1 && exitIdx !== -1 && entryIdx < exitIdx) {
+        intersectedZonesMap.set(zone.id, zone);
+        const entryPoint = safePath[entryIdx];
+        const exitPoint = safePath[exitIdx];
+        const center = { lat: zone.lat, lng: zone.lng };
+        
+        const b1 = bearingDegrees(center, entryPoint);
+        const b2 = bearingDegrees(center, exitPoint);
+        
+        let diff = (b2 - b1 + 360) % 360;
+        let direction = diff < 180 ? 1 : -1;
+        if (diff > 180) diff = 360 - diff;
+        
+        const numSteps = Math.max(8, Math.floor(diff / 5));
+        const stepAngle = (direction * diff) / numSteps;
+        
+        const detourPoints = [];
+        const safeRadius = zone.radius + 150; // 150m safety buffer
+        for (let j = 0; j <= numSteps; j++) {
+          const angle = b1 + j * stepAngle;
+          detourPoints.push(destinationPoint(center, safeRadius, angle));
+        }
+        
+        safePath.splice(entryIdx, exitIdx - entryIdx + 1, ...detourPoints);
+        modificationsMade = true;
+        break; // restart passes
+      }
+    }
+  }
+  return { safePath, intersectedZones: Array.from(intersectedZonesMap.values()) };
 }
 
 async function fetchOsrmRoute(points) {
@@ -218,22 +257,26 @@ export default function PredictiveRouting() {
         }
 
         const firstHit = intersections[0];
+        setRoutePath(primaryPath); // Show primary path temporarily
         setIntersectedZoneIds([...new Set(intersections.map((item) => item.zone.id))]);
         setStatusMessage(`⚠️ PRIMARY ROUTE AT RISK: Intersection detected at ${firstHit.zone.name}. Engaging autonomous detour...`);
 
-        const detourPoint = computeDetourPoint(firstHit, primaryPath);
-        const detourPath = await fetchOsrmRoute([origin, detourPoint, destination]);
+        // Wait a moment so the user sees the danger zone warning
+        await new Promise((r) => setTimeout(r, 1200));
         if (cancelled) return;
 
-        const safeIntersections = checkIntersection(detourPath, dangerZones);
+        const { safePath, intersectedZones } = avoidDangerZonesGeometrically(primaryPath, dangerZones);
+
         const primaryDistance = routeDistanceMeters(primaryPath);
-        const detourDistance = routeDistanceMeters(detourPath);
+        const detourDistance = routeDistanceMeters(safePath);
         const addedKm = Math.max(0, (detourDistance - primaryDistance) / 1000);
 
-        setRoutePath(detourPath);
-        setIntersectedZoneIds([...new Set(safeIntersections.map((item) => item.zone.id))]);
+        setRoutePath(safePath);
+        setIntersectedZoneIds([...new Set(intersectedZones.map((z) => z.id))]);
+        
+        const zoneNames = intersectedZones.map((z) => z.name).join(", ");
         setStatusMessage(
-          `✅ SAFE ROUTE LOCKED: Bypassing ${firstHit.zone.name}. Total safety overhead: +${addedKm.toFixed(1)} km.`,
+          `✅ SAFE ROUTE LOCKED: Bypassing ${zoneNames}. Total safety overhead: +${addedKm.toFixed(1)} km.`
         );
       } catch (err) {
         setRouteError(err?.message || "Failed to compute route.");

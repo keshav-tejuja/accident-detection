@@ -4,6 +4,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { ShieldAlert, Zap, Radio, Scan, Eye, EyeOff, AlertTriangle } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "@/services/firebase";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const FRAME_W = 640;
@@ -398,6 +400,7 @@ export default function LiveStream() {
   const [isLockedDown, setIsLockedDown] = useState(false);
   const [criticalImpactLogged, setCriticalImpactLogged] = useState(false);
   const [locationData, setLocationData] = useState({ latitude: null, longitude: null });
+  const [notificationEmail, setNotificationEmail] = useState("");
   const { currentUser } = useAuth();
 
   // Refs — hot-path reads never trigger re-renders
@@ -423,6 +426,25 @@ export default function LiveStream() {
   useEffect(() => { showOverlayRef.current = showOverlay; }, [showOverlay]);
   useEffect(() => { proximityRef.current   = proximityAlert; }, [proximityAlert]);
   useEffect(() => { isLockedDownRef.current = isLockedDown; }, [isLockedDown]);
+
+  // ── Fetch the user's notification email from Settings (Firestore config) ──
+  useEffect(() => {
+    if (!currentUser?.uid) return;
+    const fetchNotificationEmail = async () => {
+      try {
+        const configSnap = await getDoc(doc(db, "users", currentUser.uid, "config", "system"));
+        if (configSnap.exists()) {
+          const data = configSnap.data();
+          if (data.notificationEmail) {
+            setNotificationEmail(data.notificationEmail);
+          }
+        }
+      } catch (e) {
+        console.warn("Failed to fetch notification email from config:", e);
+      }
+    };
+    fetchNotificationEmail();
+  }, [currentUser?.uid]);
 
   useEffect(() => {
     if (!telemetryPreRef.current) return;
@@ -539,7 +561,8 @@ export default function LiveStream() {
           lng:             locationData.longitude,
           snapshot_base64: snapshots[0],
           snapshots:       snapshots.slice(1),
-          user_email:      currentUser?.email || null,
+          userId:          currentUser?.uid || null,
+          user_email:      notificationEmail || currentUser?.email || null,
         }),
       });
 
@@ -555,12 +578,12 @@ export default function LiveStream() {
         addLog(`⚠️ SMS failed: ${payload.sms_error}`, "warning");
       }
       if (payload?.email_dispatched) {
-        addLog(`📧 Email dispatched to ${currentUser?.email}.`, "danger");
+        addLog(`📧 Email dispatched to ${notificationEmail || currentUser?.email}.`, "danger");
       }
     } catch (err) {
       addLog(`Autonomous dispatch failed: ${err?.message || "unknown error"}`, "danger");
     }
-  }, [addLog, locationData.latitude, locationData.longitude, triggerVoiceAlert]);
+  }, [addLog, locationData.latitude, locationData.longitude, triggerVoiceAlert, notificationEmail, currentUser]);
 
   const handleManualReset = useCallback(async () => {
     setIsLockedDown(false);

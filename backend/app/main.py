@@ -24,7 +24,7 @@ try:
 except Exception:
     YOLO = None
 
-from app.services.email_service import send_emergency_email
+from app.services.email_service import send_emergency_email, verify_email_service
 
 try:
     from twilio.rest import Client
@@ -39,6 +39,9 @@ try:
         print("Firebase Admin initialized successfully.")
 except Exception as e:
     print(f"Failed to initialize Firebase Admin: {e}")
+
+# ── Email service verify (equivalent to nodemailer transporter.verify()) ──────
+verify_email_service()
 
 # ── YOLO model — loaded once at startup, shared across connections ─────────────
 # Dynamic path: resolves relative to this file so it works from any cwd
@@ -202,19 +205,35 @@ async def autonomous_log_incident(payload: AutonomousIncidentPayload):
         except Exception as twilio_err:
             sms_error = str(twilio_err)
 
+    # ── Email dispatch (hardcoded recipient) ─────────────────────────────────
     email_dispatched = False
-    if payload.user_email:
-        # Send an email with identical content to the logged-in user
-        email_body = (
-            f"🚨 CRASH ALERT\n"
-            f"Severity: Critical\n"
-            f"Maps: https://maps.google.com/?q={payload.lat},{payload.lng}"
+    email_error      = None
+    ALERT_EMAIL      = "keshavkt01@gmail.com"
+
+    maps_url = f"https://maps.google.com/?q={payload.lat},{payload.lng}" if payload.lat and payload.lng else ""
+    email_body = (
+        f"🚨 CRASH ALERT\n"
+        f"Severity: Critical\n"
+        f"Audit ID: {audit_id}\n"
+        f"Timestamp: {iso_timestamp}\n"
+        f"Coordinates: {coord_str}\n"
+        f"Maps: {maps_url}"
+    )
+    try:
+        send_emergency_email(
+            ALERT_EMAIL,
+            email_body,
+            severity="Critical",
+            audit_id=audit_id,
+            timestamp=iso_timestamp,
+            coordinates=coord_str,
+            maps_url=maps_url,
         )
-        try:
-            send_emergency_email(payload.user_email, email_body)
-            email_dispatched = True
-        except Exception as e:
-            print(f"Email error: {e}")
+        email_dispatched = True
+        print(f"✅ Crash alert email sent to {ALERT_EMAIL}")
+    except Exception as e:
+        email_error = str(e)
+        print(f"❌ Email error: {e}")
 
     last_autonomous_incident_time = now
     return {
@@ -225,6 +244,7 @@ async def autonomous_log_incident(payload: AutonomousIncidentPayload):
         "sms_dispatched": sms_dispatched,
         "sms_error":     sms_error,
         "email_dispatched": email_dispatched,
+        "email_error":   email_error,
     }
 
 
@@ -267,6 +287,31 @@ async def log_incident(payload: IncidentLogPayload):
     db.collection("accidents").add(incident_doc)
     last_incident_time = now
     return {"status": "ok", "message": "Incident logged", "audit_id": audit_id}
+
+
+# ── Quick email test endpoint ─────────────────────────────────────────────────
+@app.get("/api/test-email")
+async def test_email(to: str = ""):
+    """
+    Quick test: GET /api/test-email?to=your@email.com
+    Sends a test crash alert email so you can verify delivery.
+    """
+    if not to:
+        return {"error": "Pass ?to=your@email.com as query param"}
+
+    try:
+        result = send_emergency_email(
+            to,
+            "🚨 TEST CRASH ALERT\nSeverity: Critical\nAudit ID: TEST-0001\nTimestamp: 2026-04-29T00:00:00Z\nCoordinates: 19.0760° N, 72.8777° E\nMaps: https://maps.google.com/?q=19.0760,72.8777",
+            severity="Critical",
+            audit_id="TEST-0001",
+            timestamp="2026-04-29T00:00:00Z",
+            coordinates="19.0760° N, 72.8777° E",
+            maps_url="https://maps.google.com/?q=19.0760,72.8777",
+        )
+        return {"status": "ok", "email_sent": True, "to": to}
+    except Exception as e:
+        return {"status": "error", "email_sent": False, "error": str(e)}
 
 
 def calculate_spatial_data(pixel_width: float) -> float:
