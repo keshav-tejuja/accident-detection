@@ -74,6 +74,7 @@ async def detect_accident_route(request: DetectRequest, user: dict = Depends(get
             
         return {
             "accident": accident_data["accidentDetected"],
+            "incident_id": accident_id,
             "severity": accident_data["severity"],
             "report": gemini_report,
             "email_dispatched": email_dispatched,
@@ -81,4 +82,3 @@ async def detect_accident_route(request: DetectRequest, user: dict = Depends(get
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-

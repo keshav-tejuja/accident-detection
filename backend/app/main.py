@@ -609,9 +609,21 @@ async def live_video_feed(websocket: WebSocket):
 from app.routes import video, user, report, payment, sos, analytics, model_config, dispatch
 app.include_router(video.router,         prefix="/api/video",   tags=["Video"])
 app.include_router(user.router,          prefix="/api/user",    tags=["User"])
-app.include_router(report.router,        prefix="/api/report",  tags=["Report"])
+app.include_router(report.router,        prefix="/api/report",  tags=["Report (Legacy)"])
 app.include_router(payment.router,       prefix="/api/payment", tags=["Payment"])
 app.include_router(sos.router,           prefix="/api/sos",     tags=["SOS"])
 app.include_router(analytics.router,     prefix="/api",         tags=["Analytics"])
 app.include_router(model_config.router,  prefix="/api",         tags=["Model Config"])
 app.include_router(dispatch.router,      prefix="/api/dispatch", tags=["Dispatch"])
+
+# ── New PDF Report Generation Router ──────────────────────────────────────────
+# Mounted at /api/reports — separate from legacy /api/report
+app.include_router(report.router,        prefix="/api/reports", tags=["PDF Reports"])
+
+# ── Super Admin Router ────────────────────────────────────────────────────────
+try:
+    from app.routes import admin as admin_routes
+    app.include_router(admin_routes.router, prefix="/api/admin", tags=["Super Admin"])
+except ImportError as e:
+    print(f"[startup] Admin routes not yet available: {e}")
+

@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "firebase": "^13.0.0",
     "nodemon": "^3.1.14"
   }
 }

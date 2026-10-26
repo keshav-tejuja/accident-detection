@@ -30,6 +30,7 @@ export default function VideoUpload() {
   const [lastUploadedVideoUrl, setLastUploadedVideoUrl] = useState("");
   const [handledAnalysisId, setHandledAnalysisId] = useState(null);
   const [firstResponderOpen, setFirstResponderOpen] = useState(false);
+  const [insuranceReports, setInsuranceReports] = useState({});
 
   const handleDragOver = (e) => {
     e.preventDefault();
@@ -58,6 +59,7 @@ export default function VideoUpload() {
       setErrorMessage("");
       setOfflineBanner("");
       setLocationWarning("");
+      setInsuranceReports({});
     } else {
       setStatus("error");
       setErrorMessage("Invalid file format. Please upload a valid video file.");
@@ -87,9 +89,91 @@ export default function VideoUpload() {
       confidence,
       reportText: reportSummary,
       fullReportJson: raw?.report || null,
+      incidentId: raw?.incident_id || raw?.accident_id || null,
       severity: raw?.severity || "UNKNOWN",
       analysisId: Date.now(),
     };
+  };
+
+  const generateInsuranceReport = async (reportType) => {
+    if (!analysisResult?.incidentId || !analysisResult.detected) return;
+
+    setInsuranceReports((current) => ({
+      ...current,
+      [reportType]: { status: "generating", error: "" },
+    }));
+
+    try {
+      const token = await getFreshToken();
+      if (!token) {
+        throw new Error("Your session expired. Please log in again.");
+      }
+
+      const generate = reportType === "health"
+        ? api.generateHealthInsuranceReport
+        : api.generateMotorInsuranceReport;
+      const report = await generate(analysisResult.incidentId, token);
+
+      setInsuranceReports((current) => ({
+        ...current,
+        [reportType]: {
+          status: "ready",
+          reportId: report.report_id,
+          filename: report.filename,
+          pageCount: report.page_count,
+          message: report.status === "already_exists"
+            ? "A report was already generated for this incident."
+            : "Report generated successfully.",
+          error: "",
+        },
+      }));
+    } catch (error) {
+      setInsuranceReports((current) => ({
+        ...current,
+        [reportType]: { status: "error", error: error.message || "Report generation failed." },
+      }));
+    }
+  };
+
+  const downloadInsuranceReport = async (reportType) => {
+    const report = insuranceReports[reportType];
+    if (!report?.reportId) return;
+
+    setInsuranceReports((current) => ({
+      ...current,
+      [reportType]: { ...current[reportType], status: "downloading", error: "" },
+    }));
+
+    try {
+      const token = await getFreshToken();
+      if (!token) {
+        throw new Error("Your session expired. Please log in again.");
+      }
+
+      const pdf = await api.downloadReport(report.reportId, token);
+      const url = URL.createObjectURL(pdf);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = report.filename || `${report.reportId}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+      setInsuranceReports((current) => ({
+        ...current,
+        [reportType]: { ...current[reportType], status: "ready" },
+      }));
+    } catch (error) {
+      setInsuranceReports((current) => ({
+        ...current,
+        [reportType]: {
+          ...current[reportType],
+          status: "ready",
+          error: error.message || "Report download failed.",
+        },
+      }));
+    }
   };
 
   const handleUploadAndAnalyze = async () => {
@@ -156,6 +240,7 @@ export default function VideoUpload() {
     setSosModalOpen(false);
     setLastUploadedVideoUrl("");
     setFirstResponderOpen(false);
+    setInsuranceReports({});
   };
 
   const dispatchEmergencySOS = async (cloudinaryVideoUrl = lastUploadedVideoUrl, userCoordinates = coordinates) => {
@@ -406,12 +491,83 @@ export default function VideoUpload() {
                                   });
                               }}
                           >
-                              Download PDF Report
+                              Download AI Summary PDF
                           </Button>
                       )}
                   </div>
                   <p className="text-sm leading-6 text-zinc-200 whitespace-pre-wrap">{analysisResult.reportText}</p>
                 </div>
+
+                {analysisResult.detected && (
+                  <section className="space-y-4 rounded-lg border border-blue-400/30 bg-blue-500/5 p-4">
+                    <div>
+                      <h3 className="font-semibold text-white">Generate Accident Report</h3>
+                      <p className="mt-1 text-sm text-zinc-400">
+                        Create a downloadable, AI-assisted insurance report from the saved incident record.
+                      </p>
+                    </div>
+
+                    {!analysisResult.incidentId && (
+                      <p className="text-sm text-amber-300">
+                        The backend did not return an incident reference. Please update/restart the backend before generating a report.
+                      </p>
+                    )}
+
+                    {[
+                      ["health", "Health Insurance Report"],
+                      ["motor", "Motor Accident Insurance Claim Report"],
+                    ].map(([type, title]) => {
+                      const report = insuranceReports[type];
+                      const busy = report?.status === "generating" || report?.status === "downloading";
+
+                      return (
+                        <div key={type} className="flex flex-col gap-3 rounded-md border border-white/10 bg-black/20 p-4 sm:flex-row sm:items-center sm:justify-between">
+                          <div>
+                            <p className="font-medium text-zinc-100">{title}</p>
+                            {report?.status === "generating" && (
+                              <p role="status" className="mt-1 text-sm text-blue-300">Generating PDF report…</p>
+                            )}
+                            {report?.status === "downloading" && (
+                              <p role="status" className="mt-1 text-sm text-blue-300">Downloading PDF…</p>
+                            )}
+                            {report?.message && (
+                              <p role="status" className="mt-1 text-sm text-emerald-300">
+                                {report.message}{report.pageCount ? ` (${report.pageCount} pages)` : ""}
+                              </p>
+                            )}
+                            {report?.error && (
+                              <p role="alert" className="mt-1 text-sm text-red-300">{report.error}</p>
+                            )}
+                            {report?.reportId && (
+                              <p className="mt-1 text-xs text-zinc-500">Report ID: {report.reportId}</p>
+                            )}
+                          </div>
+                          <div className="flex shrink-0 gap-2">
+                            {report?.reportId ? (
+                              <Button
+                                type="button"
+                                disabled={busy}
+                                onClick={() => downloadInsuranceReport(type)}
+                                className="bg-emerald-600 text-white hover:bg-emerald-500"
+                              >
+                                Download PDF
+                              </Button>
+                            ) : (
+                              <Button
+                                type="button"
+                                disabled={!analysisResult.incidentId || busy}
+                                onClick={() => generateInsuranceReport(type)}
+                                className="bg-blue-600 text-white hover:bg-blue-500"
+                              >
+                                {report?.status === "generating" ? "Generating…" : "Generate Report"}
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </section>
+                )}
               </CardContent>
             </Card>
           )}

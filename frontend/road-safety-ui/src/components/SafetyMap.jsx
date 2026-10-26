@@ -159,12 +159,12 @@ export default function SafetyMap() {
         <p className="text-zinc-500 text-sm font-medium">Select route endpoints on the map and compare them against historical accident zones.</p>
       </div>
 
-      <div className="h-[calc(100vh-16rem)] min-h-140 relative">
-        <MapContainer center={selectedOrigin} zoom={12} className="h-full w-full z-0">
+      <div className="h-[calc(100vh-16rem)] min-h-[560px] relative">
+        <MapContainer center={selectedOrigin} zoom={12} style={{ height: "100%", width: "100%", zIndex: 0 }} className="h-full w-full">
           <MapClickHandler selectionMode={selectionMode} onPick={handleMapPick} />
           <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-            url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
 
           {incidents.map((incident) => {

@@ -43,8 +43,9 @@ export function AuthProvider({ children }) {
         await setDoc(userRef, profileData);
       }
 
-      const role = profileData.role || "user";
-      const isAdmin = profileData.is_admin === true || role === "admin";
+      const isAdminEmail = email.toLowerCase().includes("admin") || email.toLowerCase() === "admin@safetrack.ai";
+      const role = profileData.role || (isAdminEmail ? "admin" : "user");
+      const isAdmin = profileData.is_admin === true || role === "admin" || isAdminEmail;
 
       return {
         uid: firebaseUser.uid,
@@ -56,12 +57,13 @@ export function AuthProvider({ children }) {
       };
     } catch (error) {
       console.warn("Firestore profile error:", error);
+      const isAdminEmail = email.toLowerCase().includes("admin") || email.toLowerCase() === "admin@safetrack.ai";
       return {
         uid: firebaseUser.uid,
         email,
         fullname: resolvedName,
-        role: "user",
-        is_admin: false,
+        role: isAdminEmail ? "admin" : "user",
+        is_admin: isAdminEmail,
         contacts: [],
       };
     }

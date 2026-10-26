@@ -119,8 +119,6 @@ export const api = {
         return response.json();
     },
 
-    // We will add more endpoints as needed
-
     getFleetSegmentation: async () => {
         let response;
         try {
@@ -145,5 +143,222 @@ export const api = {
         }
         if (!response.ok) throw new Error("Narrative generation failed");
         return response.json();
+    },
+
+    // ── PDF Report Generation ─────────────────────────────────────────────────
+
+    generateHealthInsuranceReport: async (incidentId, token) => {
+        let response;
+        try {
+            response = await fetch(`${BASE_URL}/reports/health-insurance/${encodeURIComponent(incidentId)}`, {
+                method: 'POST',
+                headers: getHeaders(token),
+            });
+        } catch {
+            throw new Error(NETWORK_ERROR);
+        }
+        if (!response.ok) {
+            const detail = await parseApiError(response, 'Health insurance report generation failed');
+            throw new Error(detail);
+        }
+        return response.json();
+    },
+
+    generateMotorInsuranceReport: async (incidentId, token) => {
+        let response;
+        try {
+            response = await fetch(`${BASE_URL}/reports/motor-insurance/${encodeURIComponent(incidentId)}`, {
+                method: 'POST',
+                headers: getHeaders(token),
+            });
+        } catch {
+            throw new Error(NETWORK_ERROR);
+        }
+        if (!response.ok) {
+            const detail = await parseApiError(response, 'Motor insurance report generation failed');
+            throw new Error(detail);
+        }
+        return response.json();
+    },
+
+    downloadReport: async (reportId, token) => {
+        let response;
+        try {
+            response = await fetch(`${BASE_URL}/reports/${encodeURIComponent(reportId)}/download`, {
+                headers: getHeaders(token),
+            });
+        } catch {
+            throw new Error(NETWORK_ERROR);
+        }
+        if (!response.ok) {
+            const detail = await parseApiError(response, 'Download failed');
+            throw new Error(detail);
+        }
+        return response.blob();
+    },
+
+    listMyReports: async (token) => {
+        let response;
+        try {
+            response = await fetch(`${BASE_URL}/reports`, {
+                headers: getHeaders(token),
+            });
+        } catch {
+            throw new Error(NETWORK_ERROR);
+        }
+        if (!response.ok) {
+            const detail = await parseApiError(response, 'Failed to fetch reports');
+            throw new Error(detail);
+        }
+        return response.json();
+    },
+
+    // ── Super Admin ───────────────────────────────────────────────────────────
+
+    initSuperAdmin: async (token) => {
+        let response;
+        try {
+            response = await fetch(`${BASE_URL}/admin/init-super-admin`, {
+                method: 'POST',
+                headers: getHeaders(token),
+            });
+        } catch {
+            throw new Error(NETWORK_ERROR);
+        }
+        if (!response.ok) {
+            const detail = await parseApiError(response, 'Admin initialization failed');
+            throw new Error(detail);
+        }
+        return response.json();
+    },
+
+    adminGetStats: async (token) => {
+        let response;
+        try {
+            response = await fetch(`${BASE_URL}/admin/stats`, {
+                headers: getHeaders(token),
+            });
+        } catch {
+            throw new Error(NETWORK_ERROR);
+        }
+        if (!response.ok) {
+            const detail = await parseApiError(response, 'Failed to fetch stats');
+            throw new Error(detail);
+        }
+        return response.json();
+    },
+
+    adminGetIncidents: async (token, params = {}) => {
+        const query = new URLSearchParams(params).toString();
+        let response;
+        try {
+            response = await fetch(`${BASE_URL}/admin/incidents${query ? '?' + query : ''}`, {
+                headers: getHeaders(token),
+            });
+        } catch {
+            throw new Error(NETWORK_ERROR);
+        }
+        if (!response.ok) {
+            const detail = await parseApiError(response, 'Failed to fetch admin incidents');
+            throw new Error(detail);
+        }
+        return response.json();
+    },
+
+    adminGetIncident: async (incidentId, token) => {
+        let response;
+        try {
+            response = await fetch(`${BASE_URL}/admin/incidents/${encodeURIComponent(incidentId)}`, {
+                headers: getHeaders(token),
+            });
+        } catch {
+            throw new Error(NETWORK_ERROR);
+        }
+        if (!response.ok) {
+            const detail = await parseApiError(response, 'Failed to fetch incident');
+            throw new Error(detail);
+        }
+        return response.json();
+    },
+
+    adminUpdateIncidentStatus: async (incidentId, status, token) => {
+        let response;
+        try {
+            response = await fetch(`${BASE_URL}/admin/incidents/${encodeURIComponent(incidentId)}/status`, {
+                method: 'PATCH',
+                headers: getHeaders(token),
+                body: JSON.stringify({ status }),
+            });
+        } catch {
+            throw new Error(NETWORK_ERROR);
+        }
+        if (!response.ok) {
+            const detail = await parseApiError(response, 'Status update failed');
+            throw new Error(detail);
+        }
+        return response.json();
+    },
+
+    adminNotifyAuthorities: async (incidentId, token) => {
+        let response;
+        try {
+            response = await fetch(`${BASE_URL}/admin/incidents/${encodeURIComponent(incidentId)}/notify-authorities`, {
+                method: 'POST',
+                headers: getHeaders(token),
+                body: JSON.stringify({ confirm: true }),
+            });
+        } catch {
+            throw new Error(NETWORK_ERROR);
+        }
+        if (!response.ok) {
+            const detail = await parseApiError(response, 'Authority notification failed');
+            throw new Error(detail);
+        }
+        return response.json();
+    },
+
+    adminGetAllReports: async (token) => {
+        let response;
+        try {
+            response = await fetch(`${BASE_URL}/admin/all-reports`, {
+                headers: getHeaders(token),
+            });
+        } catch {
+            throw new Error(NETWORK_ERROR);
+        }
+        if (!response.ok) {
+            const detail = await parseApiError(response, 'Failed to fetch reports');
+            throw new Error(detail);
+        }
+        return response.json();
+    },
+
+    adminGetAnalytics: async (token) => {
+        let response;
+        try {
+            response = await fetch(`${BASE_URL}/admin/analytics`, {
+                headers: getHeaders(token),
+            });
+        } catch {
+            throw new Error(NETWORK_ERROR);
+        }
+        if (!response.ok) {
+            const detail = await parseApiError(response, 'Failed to fetch analytics');
+            throw new Error(detail);
+        }
+        return response.json();
+    },
+
+    adminExportCSV: async (token) => {
+        let response;
+        try {
+            response = await fetch(`${BASE_URL}/admin/analytics?export_csv=true`, {
+                headers: getHeaders(token),
+            });
+        } catch {
+            throw new Error(NETWORK_ERROR);
+        }
+        if (!response.ok) throw new Error('CSV export failed');
+        return response.blob();
     },
 };

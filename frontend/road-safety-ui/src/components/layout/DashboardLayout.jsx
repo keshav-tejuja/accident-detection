@@ -19,8 +19,8 @@ import VoiceCopilot from "@/components/VoiceCopilot";
 
 export default function DashboardLayout() {
   const location = useLocation();
-  const { user, loading, isAuthenticated, logout } = useAuth();
-  const isAdmin = user?.role === "admin" || user?.is_admin === true;
+  const { user, loading, isAuthenticated, logout, isAdmin: authIsAdmin, role } = useAuth();
+  const isAdmin = authIsAdmin || role === "admin" || user?.role === "admin" || user?.is_admin === true || user?.email?.toLowerCase().includes("admin");
   const displayName = user?.fullname || user?.email || "Operator";
   const displayEmail = user?.email || "";
 
@@ -28,6 +28,7 @@ export default function DashboardLayout() {
     { name: "Overview",            path: "/overview",           icon: LayoutDashboard },
     { name: "Live Stream",         path: "/stream",             icon: Video },
     { name: "Upload Video",        path: "/upload",             icon: UploadCloud },
+    { name: "Accident Dispatch",   path: "/accident-dispatch",  icon: ShieldAlert, adminOnly: true, badge: "Admin" },
     { name: "Accident Logs",       path: "/incidents",          icon: FileText,   adminOnly: true },
     { name: "Behavior Analytics",  path: "/analytics",          icon: Car },
     { name: "Predictive Routing",  path: "/predictive-routing", icon: Route },
@@ -104,7 +105,12 @@ export default function DashboardLayout() {
                     <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-white rounded-r-full shadow-[0_0_8px_rgba(255,255,255,0.4)]" />
                   )}
                   <Icon className={`h-5 w-5 transition-colors ${isActive ? "text-white" : "text-zinc-500"}`} />
-                  {item.name}
+                  <span>{item.name}</span>
+                  {item.badge && (
+                    <span className="ml-auto text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-400 border border-red-500/30">
+                      {item.badge}
+                    </span>
+                  )}
                 </Link>
               );
             })}

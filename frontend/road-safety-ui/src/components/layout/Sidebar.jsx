@@ -10,6 +10,7 @@ export const Sidebar = () => {
 
     const navItems = [
         { label: 'System Overview',    path: '/admin/dashboard', icon: LayoutDashboard },
+        { label: 'Accident Dispatch',  path: '/admin/accident-dispatch', icon: ShieldAlert },
         { label: 'Live Incident Map',  path: '/admin/incident-map', icon: MapPin },
         { label: 'User Management',    path: '/admin/users',     icon: Users },
         { label: 'Model Config',       path: '/admin/config',    icon: Brain },

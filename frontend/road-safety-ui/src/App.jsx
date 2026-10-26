@@ -12,6 +12,7 @@ import DispatchRouting from "./pages/admin/DispatchRouting";
 import ReportAuditQueue from "./pages/admin/ReportAuditQueue";
 import { UserManagement } from "./pages/admin/UserManagement";
 import LiveIncidentMap from "./pages/admin/LiveIncidentMap";
+import AccidentDispatchPage from "./pages/admin/AccidentDispatchPage";
 import Overview from "./pages/dashboard/Overview";
 import BehaviorAnalytics from "./pages/dashboard/BehaviorAnalytics";
 import LiveStream from "./pages/dashboard/LiveStream";
@@ -101,12 +102,13 @@ function AppRoutes() {
 
           <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
             <Route path="/admin" element={<AdminLayout />}>
-              <Route path="dashboard"    element={<AdminDashboard />} />
-              <Route path="incident-map" element={<LiveIncidentMap />} />
-              <Route path="config"       element={<ModelConfigPanel />} />
-              <Route path="dispatch" element={<DispatchRouting />} />
-              <Route path="reports" element={<ReportAuditQueue />} />
-              <Route path="users" element={<UserManagement />} />
+              <Route path="dashboard"          element={<AdminDashboard />} />
+              <Route path="accident-dispatch"  element={<AccidentDispatchPage />} />
+              <Route path="incident-map"       element={<LiveIncidentMap />} />
+              <Route path="config"             element={<ModelConfigPanel />} />
+              <Route path="dispatch"           element={<DispatchRouting />} />
+              <Route path="reports"            element={<ReportAuditQueue />} />
+              <Route path="users"              element={<UserManagement />} />
               <Route index element={<Navigate to="/admin/config" replace />} />
             </Route>
           </Route>
@@ -114,15 +116,16 @@ function AppRoutes() {
           <Route element={<ProtectedRoute allowedRoles={["user", "admin"]} />}>
             <Route path="/" element={<DashboardLayout />}>
               <Route index element={<RoleHomeRedirect />} />
-              <Route path="overview"          element={<Overview />} />
-              <Route path="stream"           element={<LiveStream />} />
-              <Route path="upload"           element={<VideoUpload />} />
-              <Route path="incidents"        element={<AdminRoute><IncidentLog /></AdminRoute>} />
-              <Route path="analytics"        element={<BehaviorAnalytics />} />
+              <Route path="overview"           element={<Overview />} />
+              <Route path="stream"             element={<LiveStream />} />
+              <Route path="upload"             element={<VideoUpload />} />
+              <Route path="accident-dispatch"  element={<AdminRoute><AccidentDispatchPage /></AdminRoute>} />
+              <Route path="incidents"          element={<AdminRoute><IncidentLog /></AdminRoute>} />
+              <Route path="analytics"          element={<BehaviorAnalytics />} />
               <Route path="predictive-routing" element={<PredictiveRouting />} />
-              <Route path="simulator"        element={<SafetySimulator />} />
-              <Route path="billing"          element={<Billing />} />
-              <Route path="settings"         element={<Settings />} />
+              <Route path="simulator"          element={<SafetySimulator />} />
+              <Route path="billing"            element={<Billing />} />
+              <Route path="settings"           element={<Settings />} />
             </Route>
           </Route>
 
